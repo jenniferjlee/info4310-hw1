@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title> INFO 4310 HW 1</title>
+  <script src="https://d3js.org/d3.v6.min.js"></script>
+  <script src=" https://d3js.org/topojson.v2.min.js"> </script>
+  <style>
+    /* Source: https://fonts.google.com/specimen/Open+Sans?sidebar.open=true&selection.family=Open+Sans:wght@300;400 */
+    @font-face {
+      font-family: "open_sans";
+      src: url("./fonts/OpenSans-Light.ttf");
+    }
+
+    @font-face {
+      font-family: "open_sans_bold";
+      src: url("./fonts/OpenSans-Regular.ttf");
+      font-weight: bold;
+    }
+
+    @font-face {
+      font-family: "open_sans_bolder";
+      src: url("./fonts/OpenSans-Bold.ttf");
+      font-weight: bold;
+    }
+
+
+    body {
+      /* font-family: 'Lato', 'Helvetica', sans-serif; */
+      font-family: "open_sans", 'Helvetica Neue', 'Helvetica', 'Arial', sans-serif;
+      /* font-weight: 400; */
+      margin: 20px;
+      background-color: #ebe7dc;
+      padding-left: 20px;
+      padding-right: 20px;
+    }
+
+    /* 
+    h1,
+    h2,
+    h3 {
+      text-align: center;
+    } */
+
+    .themed {
+      color: #ad9c7b;
+    }
+
+    h2 {
+      font-size: 18px;
+    }
+
+    h3 {
+      font-size: 13px;
+    }
+
+    p {
+      font-size: 16px;
+    }
+
+
+    strong {
+      font-weight: bold;
+      font-family: "open_sans_bolder";
+    }
+
+    .state {
+      fill: #EEE;
+      stroke: white;
+      stroke-width: 2px;
+    }
+
+    /* #maparea,
+    #densitymap {
+      display: block;
+      margin: auto;
+    } */
+
+    .container {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .description {
+      flex-basis: 35%;
+    }
+
+    hr {
+      border: 1px solid #ad9c7b;
+    }
+  </style>
+</head>
+
+<body>
+  <h1 class="themed">The Worst Pollen Offenders</h1>
+  <h2>Mapping pollen offender <strong>density</strong>, <strong>species</strong>, and
+    <strong>growth rates</strong> in
+    San Francisco</h2>
+  <h3> Jennifer Lee | INFO 4310 HW 1</h3>
+
+  <div class="container">
+    <div class="description">
+      <h2 class="themed">Where should I avoid?</h2>
+      <p>Allergies aren’t just nasal discomfort – they can have a huge impact on your quality of life. With sneezing,
+        a stuffy nose, and watery eyes, allergies can make it difficult to enjoy everyday activities, disrupt sleep, and
+        increase risk for other health problems. To treat allergies, avoiding the trees, flowers, grasses, and weeds
+        that trigger the allergies is an important first step to reduce symptoms. Some trees such as juniper, maple,
+        elm, oak, and cypress are notorious for releasing large amounts of pollen and compromising immune systems
+        throughout the year, making them the worst offenders. </p>
+      <p>To help navigate the city and county of San Francisco, we look at the density of trees with severe
+        allergenicity. Richmond seems like a relatively safer district to wander into, but watch out when you’re in the
+        Sunset and Bernal Heights/Bayview districts!
+      </p>
+    </div>
+    <svg id="densitymap" width="800" height="800"></svg>
+  </div>
+  <hr />
+  <div class="container">
+    <div class="description">
+      <h2 class="themed">Where should I live?</h2>
+      <p>Thinking of living in the area? Let’s take a closer look into the trees that are causing the problem. Of the
+        five major types of trees with significant allergenic properties, they aren’t equally distributed throughout San
+        Francisco. If you have nasal allergies to only certain trees, some districts may not be a worry for you.
+        However, living in the area, you also have to think about the future, if these trees may grow to dominate the
+        area.
+      </p>
+      To help make these decisions, we look at the locations of the five major types of trees with significant
+      allergenic properties as well as the historical growth rate of the trees since planted. We were worried about the
+      Sunset and Bernal Heights/Bayview districts and now we can see that Sunset mainly has elm trees. If these aren’t a
+      problem for you, then the Sunset district is perfect, but if they are, we can see they’re growing relatively fast,
+      so definitely be aware of the risks.
+      <p>
+        Now, we can make better decisions on where to roam and reside in San Francisco, knowing the densities,
+        locations, and growth rates of the worse pollen offenders. Be kind to your nose!
+      </p>
+    </div>
+    <svg id="maparea" width="800" height="800"></svg>
+  </div>
+
+  <script>
+    const densitymap = d3.select("#densitymap");
+    const svg = d3.select("#maparea");
+    const width = svg.attr("width");
+    const height = svg.attr("height");
+    const margin = { top: 20, right: 20, bottom: 20, left: 20 };
+    const mapWidth = width - margin.left - margin.right;
+    const mapHeight = height - margin.top - margin.bottom;
+    const map = svg.append("g").attr("id", "map")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+    const underShift = margin.top + 20;
+    const under = svg.append("g").attr("id", "under")
+      .attr("transform", "translate(" + margin.left + "," + underShift + ")");
+
+    const getData = async function () {
+      const sf = await d3.json("./SF-Neighborhoods.geo.json", d3.autoType);
+      console.log(sf);
+
+      var neighborhoods = topojson.feature(sf, sf.objects['SFNeighborhoods']);
+      var projection = d3.geoMercator().fitSize([mapWidth, mapHeight], neighborhoods);
+      var path = d3.geoPath().projection(projection);
+
+      map.selectAll("path.neighborhood").data(neighborhoods.features)
+        .join("path")
+        .attr("class", "state")
+        .attr("d", path);
+
+      densitymap.selectAll("path.neighborhood").data(neighborhoods.features)
+        .join("path")
+        .attr("class", "state")
+        .attr("d", path);
+
+      var trees = await d3.csv("./Street_Tree_List-2020-08-20_FILTERED.csv", d3.autoType);
+      // console.log(trees);
+
+      // console.log(trees.length); 37167
+
+      // filter out trees that don't have species or DBH
+      trees = trees.filter((d) => {
+        return d['qSpecies'] != "" && d['DBH'] != ""
+      });
+      // console.log(trees.length); 36715
+
+      const timeParser = d3.timeParse('%m/%d/%Y %I:%M:%S %p');
+      trees.forEach(d => {
+        d['date'] = timeParser(d["PlantDate"]);
+      });
+
+      // get pixel positions in one go
+      trees.forEach(d => {
+        d.Position = projection([d.Longitude, d.Latitude]);
+      });
+
+      // get common name 
+      trees.forEach((d, i) => {
+        d['name'] = d['qSpecies'].substr(d['qSpecies'].indexOf(':: ') + 3);
+      });
+
+      const dateExtent = d3.extent(trees, d => d['date']);
+      console.log(dateExtent);
+
+      // figure out top 6 species
+      var counts = {}
+      trees.forEach((d, i) => {
+        let name = d['name'];
+        if (name in counts) {
+          counts[name]++;
+        } else {
+          counts[name] = 1;
+        }
+      });
+      // console.log(counts);
+
+      // sort
+      var countsarray = Object.keys(counts).map(function (name) {
+        return [name, counts[name]];
+      });
+      // console.log(countsarray);
+
+      // Sort the array based on the second element
+      countsarray.sort(function (first, second) {
+        return second[1] - first[1];
+      });
+      // console.log(countsarray);
+      // Most common species are Swamp Myrtle, Brisbane Box, Hybrid Strawberry Tree, Victorian Box, 
+      // New Zealand Xmas Tree, Southern Magnolia
+      // Before filtering out date, most common are Sycamore: London Plane, New Zealand Xmas Tree,
+      // Brisbane Box, Swamp Myrtle, Victorian Box, Indian Laurel Fig Tree 'Green Gem'" (all in top 10/418)
+      // Makes sense to do top 6 species of total set (enough data- in top 14/290 species of filtered)
+
+      // // filter for those 6 species
+      // console.log(trees.length);
+      // trees = trees.filter((d) => {
+      //   return d['name'] == "Sycamore: London Plane" || d['name'] == "New Zealand Xmas Tree" ||
+      //     d['name'] == "Brisbane Box" || d['name'] == "Swamp Myrtle" || d['name'] == "Victorian Box" ||
+      //     d['name'] == "Indian Laurel Fig Tree 'Green Gem'"
+      // });
+      // console.log(trees.length); // 2853
+
+      // pollen groups
+      const pollens = ["Juniper", "Maple", "Elm", "Oak", "Cypress"];
+
+      // filter for pollen groups
+      trees = trees.filter((d) => {
+        return d['name'].indexOf("Juniper") !== -1 || d['name'].indexOf("Maple") !== -1 ||
+          d['name'].indexOf("Elm") !== -1 || d['name'].indexOf("Oak") !== -1 ||
+          d['name'].indexOf("Cypress") !== -1
+      });
+
+
+      const now = new Date(2020, 7, 20, 0, 0, 0, 0); // last updated August 20 2020 todo- update?
+
+      // const names = ["Sycamore: London Plane", "New Zealand Xmas Tree", "Brisbane Box", "Swamp Myrtle",
+      //   "Victorian Box", "Indian Laurel Fig Tree 'Green Gem'"];
+      const names = ["Sycamore: London Plane", "New Zealand Xmas Tree", "Brisbane Box", "Swamp Myrtle",
+        "Victorian Box"];
+      const speciesScale = d3.scaleOrdinal(d3.schemeSet2);
+
+      var minRad = 3;
+      var maxRad = 10;
+      pollens.forEach((pollen, i) => {
+        // Choose one species- look at Sycamore: London Plane
+        // determine extent of growth rate = diameter/age
+        var slp = trees.filter((d) => {
+          // return d['name'] == name
+          // console.log(d['name']);
+          return d['name'].indexOf(pollen) !== -1
+        });
+        console.log(slp.length); // 383
+
+        // convert growth rate = diameter/milliseconds since planted
+        slp.forEach((d, i) => {
+          d['rate'] = d['DBH'] / (now - d['date'])
+        });
+        // console.log(slp);
+
+        var rateExtent = d3.extent(slp, d => d['rate']);
+        // console.log(rateExtent);
+        var rateScale = d3.scaleLinear().domain(rateExtent).range([minRad, maxRad]);
+
+        // for top species
+        // var nameClass = name.substr(name).indexOf(' ');
+        //var nameClass = name.split(' ')[0].replace(/[^\w]/g, '');
+
+        var pollenClass = pollen.split(' ')[0].replace(/[^\w]/g, '');
+
+        // make sizes 
+        map.selectAll(".".concat(pollenClass)).data(slp)
+          .join("circle")
+          .attr("class", pollenClass)
+          .attr("id", d => d["TreeID"])
+          .attr("r", d => rateScale(d["rate"]))
+          .attr("fill", d => speciesScale(pollen))
+          .attr("opacity", 0.6)
+          .attr("cx", d => d.Position[0])
+          .attr("cy", d => d.Position[1]);
+
+        d3.select(".types")
+          .append("span")
+          .text(pollen)
+          .style("color", speciesScale(pollen));
+
+      })
+
+      under.append("text")
+        .text("Worst Pollen Offenders")
+        .style("fill", "black")
+        .attr("x", 225)
+        .attr("y", 20)
+        .attr("text-anchor", "middle")
+        .attr("font-size", 15);
+
+      console.log(pollens);
+
+      pollens.forEach((d, i) => {
+        var offset = 60;
+        if (d != "Juniper") {
+          offset += 30;
+        }
+        if (d != "Maple") {
+          offset += 15;
+        }
+        under.append("text")
+          .style("fill", speciesScale(d))
+          .text(d)
+          .attr("x", i * 50 + offset)
+          .attr("y", 50)
+          .attr("text-anchor", "left")
+          .attr("font-family", "open_sans_bold");
+      });
+
+      var posMin = 450;
+      var posMax = 600;
+
+      under.append("text")
+        .text("Growth Rate")
+        .style("fill", "black")
+        .attr("x", (posMin + posMax) / 2 - 10)
+        .attr("y", 20)
+        .attr("text-anchor", "middle")
+        .attr("font-size", 15);
+
+      sizes = [{ size: minRad, label: "Slow" }, { size: minRad + (maxRad - minRad) * .25, label: "" }, { size: (minRad + maxRad) / 2, label: "Normal" },
+      { size: minRad + (maxRad - minRad) * .75, label: "" }, { size: maxRad, label: "Fast" }];
+      gTags = under.selectAll("g").data(sizes).join("g");
+
+      gTags.append("circle").attr("cx", (d, i) => (posMin + (posMax - posMin) * i / sizes.length))
+        .attr("cy", 35)
+        .attr("r", d => d.size)
+        .attr("fill", "#ad9c7b");
+
+      gTags.append("text").attr("x", (d, i) => (posMin + (posMax - posMin) * i / sizes.length))
+        .attr("y", 55)
+        .text(d => d.label)
+        .attr("fill", "black")
+        .attr("text-anchor", "middle")
+        .attr("font-size", 12);
+
+      // console.log(trees.length); //2301
+
+
+      // contour- account for spreading with estimation
+      var densityData = d3.contourDensity()
+        .x(function (d) { return d.Position[0]; })   // x and y = column name in .csv input data
+        .y(function (d) { return d.Position[1]; })
+        .size([mapWidth, mapHeight])
+        .bandwidth(20)    // smaller = more precision in lines = more lines
+        (trees)
+
+      const densityExtent = d3.extent(densityData, d => d.value);
+      // console.log(densityExtent);
+      const densityScale = d3.scaleSequentialLog(densityExtent, d3.interpolateMagma)
+
+
+      densitymap
+        .selectAll(".contour")
+        .data(densityData)
+        .enter()
+        .append("path")
+        .attr("class", "contour")
+        .attr("d", d3.geoPath())
+        .attr("fill", function (d) { return densityScale(d.value); })
+        .attr("opacity", .2)
+        .attr("stroke", "black")
+        .attr("stroke-linejoin", "round");
+
+      // names
+      districts = [{ name: "Downtown", coordinates: [-122.399945, 37.794574] },
+      { name: "Richmond", coordinates: [-122.4830, 37.7780] },
+      { name: "Sunset", coordinates: [-122.4952495, 37.7535418] },
+      { name: "Upper Market", coordinates: [-122.443815511, 37.752869] },
+      { name: "Bernal Heights/Bayview", coordinates: [-122.413132, 37.743465] }];
+
+      // Note: Upper Market and beyond (south central) and Bernal Heights/Bayview and beyond (southeast)
+
+      densitymap.selectAll("text").data(districts).join("text")
+        .attr("x", d => projection(d.coordinates)[0])
+        .attr("y", d => projection(d.coordinates)[1])
+        .text(d => d.name)
+        .attr("fill", "black")
+        .attr("text-anchor", "middle")
+        .attr("font-size", 12)
+        .attr("font-weight", 400)
+        .attr("font-family", "open_sans_bolder");
+
+
+    }
+    getData();
+  </script>
+
+</body>
+
+</html>
